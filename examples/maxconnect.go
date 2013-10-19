@@ -8,6 +8,7 @@ import (
 	"os"
 	//"time"
 	//"sync/atomic"
+	"runtime"
 	xorm "xorm"
 )
 
@@ -34,7 +35,9 @@ func test(engine *xorm.Engine) {
 		return
 	}
 
-	size := 500
+	engine.ShowSQL = true
+	engine.Pool.SetMaxConns(5)
+	size := 1000
 	queue := make(chan int, size)
 
 	for i := 0; i < size; i++ {
@@ -78,13 +81,12 @@ func test(engine *xorm.Engine) {
 		<-queue
 	}
 
-	//conns := atomic.LoadInt32(&xorm.ConnectionNum)
-	//fmt.Println("connection number:", conns)
 	fmt.Println("end")
 }
 
 func main() {
-	fmt.Println("-----start sqlite go routines-----")
+	runtime.GOMAXPROCS(2)
+	fmt.Println("create engine")
 	engine, err := sqliteEngine()
 	if err != nil {
 		fmt.Println(err)
@@ -93,10 +95,9 @@ func main() {
 	engine.ShowSQL = true
 	fmt.Println(engine)
 	test(engine)
-	fmt.Println("test end")
+	fmt.Println("------------------------")
 	engine.Close()
 
-	fmt.Println("-----start mysql go routines-----")
 	engine, err = mysqlEngine()
 	if err != nil {
 		fmt.Println(err)

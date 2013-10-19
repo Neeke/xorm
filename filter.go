@@ -25,10 +25,10 @@ func (s *PgSeqFilter) Do(sql string, session *Session) string {
 	return res
 }
 
-type PgQuoteFilter struct {
+type QuoteFilter struct {
 }
 
-func (s *PgQuoteFilter) Do(sql string, session *Session) string {
+func (s *QuoteFilter) Do(sql string, session *Session) string {
 	return strings.Replace(sql, "`", session.Engine.QuoteStr(), -1)
 }
 
@@ -37,7 +37,9 @@ type IdFilter struct {
 
 func (i *IdFilter) Do(sql string, session *Session) string {
 	if session.Statement.RefTable != nil && session.Statement.RefTable.PrimaryKey != "" {
-		return strings.Replace(sql, "(id)", session.Statement.RefTable.PrimaryKey, -1)
+		sql = strings.Replace(sql, "`(id)`", session.Engine.Quote(session.Statement.RefTable.PrimaryKey), -1)
+		sql = strings.Replace(sql, session.Engine.Quote("(id)"), session.Engine.Quote(session.Statement.RefTable.PrimaryKey), -1)
+		return strings.Replace(sql, "(id)", session.Engine.Quote(session.Statement.RefTable.PrimaryKey), -1)
 	}
 	return sql
 }

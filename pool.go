@@ -1,14 +1,3 @@
-// Copyright 2013 The XORM Authors. All rights reserved.
-// Use of this source code is governed by a BSD
-// license that can be found in the LICENSE file.
-
-// Package xorm provides is a simple and powerful ORM for Go. It makes your
-// database operation simple.
-
-// This file contains a connection pool interafce and two implements. One is
-// NoneConnectionPool is for direct connecting, another is a simple connection
-// pool by lock. Attention, the driver may has provided connection pool itself.
-// So the default pool is NoneConnectionPool.
 package xorm
 
 import (
@@ -16,6 +5,7 @@ import (
 	//"fmt"
 	"sync"
 	//"sync/atomic"
+	"container/list"
 	"time"
 )
 
@@ -32,6 +22,8 @@ type IConnectPool interface {
 	Close(engine *Engine) error
 	SetMaxIdleConns(conns int)
 	MaxIdleConns() int
+	SetMaxConns(conns int)
+	MaxConns() int
 }
 
 // Struct NoneConnectPool is a implement for IConnectPool. It provides directly invoke driver's
@@ -72,12 +64,25 @@ func (p *NoneConnectPool) MaxIdleConns() int {
 	return 0
 }
 
+// not implemented
+func (p *NoneConnectPool) SetMaxConns(conns int) {
+}
+
+// not implemented
+func (p *NoneConnectPool) MaxConns() int {
+	return -1
+}
+
 // Struct SysConnectPool is a simple wrapper for using system default connection pool.
 // About the system connection pool, you can review the code database/sql/sql.go
 // It's currently default Pool implments.
 type SysConnectPool struct {
 	db           *sql.DB
 	maxIdleConns int
+	maxConns     int
+	curConns     int
+	mutex        *sync.Mutex
+	queue        *list.List
 }
 
 // NewSysConnectPool new a SysConnectPool.
@@ -93,16 +98,65 @@ func (s *SysConnectPool) Init(engine *Engine) error {
 	}
 	s.db = db
 	s.maxIdleConns = 2
+	s.maxConns = -1
+	s.curConns = 0
+	s.mutex = &sync.Mutex{}
+	s.queue = list.New()
 	return nil
 }
 
+type node struct {
+	mutex sync.Mutex
+	cond  *sync.Cond
+}
+
+func newCondNode() *node {
+	n := &node{}
+	n.cond = sync.NewCond(&n.mutex)
+	return n
+}
+
 // RetrieveDB just return the only db
-func (p *SysConnectPool) RetrieveDB(engine *Engine) (db *sql.DB, err error) {
-	return p.db, nil
+func (s *SysConnectPool) RetrieveDB(engine *Engine) (db *sql.DB, err error) {
+	/*if s.maxConns > 0 {
+		fmt.Println("before retrieve")
+		s.mutex.Lock()
+		for s.curConns >= s.maxConns {
+			fmt.Println("before waiting...", s.curConns, s.queue.Len())
+			s.mutex.Unlock()
+			n := NewNode()
+			n.cond.L.Lock()
+			s.queue.PushBack(n)
+			n.cond.Wait()
+			n.cond.L.Unlock()
+			s.mutex.Lock()
+			fmt.Println("after waiting...", s.curConns, s.queue.Len())
+		}
+		s.curConns += 1
+		s.mutex.Unlock()
+		fmt.Println("after retrieve")
+	}*/
+	return s.db, nil
 }
 
 // ReleaseDB do nothing
-func (p *SysConnectPool) ReleaseDB(engine *Engine, db *sql.DB) {
+func (s *SysConnectPool) ReleaseDB(engine *Engine, db *sql.DB) {
+	/*if s.maxConns > 0 {
+		s.mutex.Lock()
+		fmt.Println("before release", s.queue.Len())
+		s.curConns -= 1
+
+		if e := s.queue.Front(); e != nil {
+			n := e.Value.(*node)
+			//n.cond.L.Lock()
+			n.cond.Signal()
+			fmt.Println("signaled...")
+			s.queue.Remove(e)
+			//n.cond.L.Unlock()
+		}
+		fmt.Println("after released", s.queue.Len())
+		s.mutex.Unlock()
+	}*/
 }
 
 // Close closed the only db
@@ -117,6 +171,17 @@ func (p *SysConnectPool) SetMaxIdleConns(conns int) {
 
 func (p *SysConnectPool) MaxIdleConns() int {
 	return p.maxIdleConns
+}
+
+// not implemented
+func (p *SysConnectPool) SetMaxConns(conns int) {
+	p.maxConns = conns
+	//p.db.SetMaxOpenConns(conns)
+}
+
+// not implemented
+func (p *SysConnectPool) MaxConns() int {
+	return p.maxConns
 }
 
 // NewSimpleConnectPool new a SimpleConnectPool
@@ -204,4 +269,13 @@ func (p *SimpleConnectPool) SetMaxIdleConns(conns int) {
 
 func (p *SimpleConnectPool) MaxIdleConns() int {
 	return p.maxIdleConns
+}
+
+// not implemented
+func (p *SimpleConnectPool) SetMaxConns(conns int) {
+}
+
+// not implemented
+func (p *SimpleConnectPool) MaxConns() int {
+	return -1
 }

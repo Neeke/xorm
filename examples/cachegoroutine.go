@@ -59,7 +59,8 @@ func test(engine *xorm.Engine) {
 						} else if x+j < 16 {
 							_, err = engine.Insert(&User{Name: "xlw"})
 						} else if x+j < 32 {
-							_, err = engine.Id(1).Delete(u)
+							//_, err = engine.Id(1).Delete(u)
+							_, err = engine.Delete(u)
 						}
 						if err != nil {
 							fmt.Println(err)
@@ -91,6 +92,8 @@ func main() {
 		return
 	}
 	engine.ShowSQL = true
+	cacher := xorm.NewLRUCacher(xorm.NewMemoryStore(), 1000)
+	engine.SetDefaultCacher(cacher)
 	fmt.Println(engine)
 	test(engine)
 	fmt.Println("test end")
@@ -98,6 +101,9 @@ func main() {
 
 	fmt.Println("-----start mysql go routines-----")
 	engine, err = mysqlEngine()
+	engine.ShowSQL = true
+	cacher = xorm.NewLRUCacher(xorm.NewMemoryStore(), 1000)
+	engine.SetDefaultCacher(cacher)
 	if err != nil {
 		fmt.Println(err)
 		return

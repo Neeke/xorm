@@ -1,10 +1,3 @@
-// Copyright 2013 The XORM Authors. All rights reserved.
-// Use of this source code is governed by a BSD
-// license that can be found in the LICENSE file.
-
-// Package xorm provides is a simple and powerful ORM for Go. It makes your
-// database operation simple.
-
 package xorm
 
 import (
@@ -12,9 +5,21 @@ import (
 //"strings"
 )
 
+// name translation between struct, fields names and table, column names
 type IMapper interface {
 	Obj2Table(string) string
 	Table2Obj(string) string
+}
+
+type SameMapper struct {
+}
+
+func (m SameMapper) Obj2Table(o string) string {
+	return o
+}
+
+func (m SameMapper) Table2Obj(t string) string {
+	return t
 }
 
 type SnakeMapper struct {
@@ -39,7 +44,7 @@ func snakeCasedName(name string) string {
 	return string(newstr)
 }
 
-func Pascal2Sql(s string) (d string) {
+func pascal2Sql(s string) (d string) {
 	d = ""
 	lastIdx := 0
 	for i := 0; i < len(s); i++ {
@@ -70,7 +75,9 @@ func titleCasedName(name string) string {
 		switch {
 		case upNextChar:
 			upNextChar = false
-			chr -= ('a' - 'A')
+			if 'a' <= chr && chr <= 'z' {
+				chr -= ('a' - 'A')
+			}
 		case chr == '_':
 			upNextChar = true
 			continue
